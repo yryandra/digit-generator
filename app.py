@@ -11,7 +11,42 @@ import streamlit as st
 import torch
 from torchvision.utils import make_grid
 import matplotlib.pyplot as plt
-from cvae import CVAE, one_hot
+import torch.nn as nn
+import torch.nn.functional as F
+
+# Define the CVAE model inline
+class CVAE(nn.Module):
+    def __init__(self):
+        super(CVAE, self).__init__()
+        self.fc1 = nn.Linear(28*28 + 10, 256)
+        self.fc21 = nn.Linear(256, 20)
+        self.fc22 = nn.Linear(256, 20)
+        self.fc3 = nn.Linear(20 + 10, 256)
+        self.fc4 = nn.Linear(256, 28*28)
+
+    def encode(self, x, y):
+        inputs = torch.cat([x.view(-1, 28*28), y], dim=1)
+        h1 = F.relu(self.fc1(inputs))
+        return self.fc21(h1), self.fc22(h1)
+
+    def reparameterize(self, mu, logvar):
+        std = torch.exp(0.5*logvar)
+        eps = torch.randn_like(std)
+        return mu + eps*std
+
+    def decode(self, z, y):
+        inputs = torch.cat([z, y], dim=1)
+        h3 = F.relu(self.fc3(inputs))
+        return torch.sigmoid(self.fc4(h3))
+
+    def forward(self, x, y):
+        mu, logvar = self.encode(x, y)
+        z = self.reparameterize(mu, logvar)
+        return self.decode(z, y), mu, logvar
+
+# Inline one-hot function too
+def one_hot(labels, num_classes=10):
+    return F.one_hot(labels, num_classes=num_classes).float()
 
 st.set_page_config(page_title="Digit Generator", layout="centered")
 st.title("MNIST Digit Generator")
